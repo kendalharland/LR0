@@ -10,7 +10,7 @@ Generate the set of LR(0) items from an augmented grammar
 
 ####runnning:
 <pre>
-	./lrz < grammar.txt
+	./lrz \< grammar.txt
 </pre>
 
 ###example grammar:
