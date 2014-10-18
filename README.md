@@ -4,17 +4,17 @@ LR0
 Generate the set of LR(0) items from an augmented grammar
 
 ####compling:
-```bash
+<pre>
 	make
-```
+</pre>
 
 ####runnning:
-```bash
+<pre>
 	./lrz < grammar.txt
-```
+</pre>
 
 ###example grammar:
-```bash
+<pre>
 	E
 	E->E+T
 	E->T
@@ -22,10 +22,10 @@ Generate the set of LR(0) items from an augmented grammar
 	T->F
 	F->(E)
 	F->i
-```
+</pre>
 
 ###example output:
-```bash
+<pre>
 	Augmented Grammar
 	-----------------
 	'->E
@@ -84,4 +84,4 @@ Generate the set of LR(0) items from an augmented grammar
 		T->T*F@
 	I11:
 		F->(E)@
-```
+</pre>
