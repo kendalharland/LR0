@@ -25,7 +25,7 @@ Generate the set of LR(0) items from an augmented grammar
 ```
 
 ###example output:
-```bash
+<pre>
 	Augmented Grammar
 	-----------------
 	'->E
@@ -84,4 +84,5 @@ Generate the set of LR(0) items from an augmented grammar
 		T->T*F@
 	I11:
 		F->(E)@
-```
+
+</pre>
