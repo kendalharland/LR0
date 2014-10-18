@@ -9,12 +9,12 @@ Generate the set of LR(0) items from an augmented grammar
 </pre>
 
 ####runnning:
-<pre>
-	./lrz \< grammar.txt
-</pre>
+```
+	./lrz < grammar.txt
+```
 
 ###example grammar:
-<pre>
+```
 	E
 	E->E+T
 	E->T
@@ -22,7 +22,7 @@ Generate the set of LR(0) items from an augmented grammar
 	T->F
 	F->(E)
 	F->i
-</pre>
+```
 
 ###example output:
 <pre>
