@@ -8,28 +8,18 @@
 
 using namespace std;
 
-// Type for representing an augmented grammar
 typedef map<char, vector<string> > AugmentedGrammar;
+typedef map<string, int> GotoMap; // <aps productions to LR(0) item ids
 
-// Type for representing the global set of gotos, maps productions to LR(0) item ids
-typedef map<string, int> GotoMap;
-
-
-// Production type
+// structy for representing an augmented grammar production
 struct AugmentedProduction
 {
     char lhs;   // left hand side of production
     string rhs; // right hand side of production
-    AugmentedProduction* next;
 
-    AugmentedProduction() : next(NULL) {}
-
-    AugmentedProduction(char _lhs, string _rhs)
-    : lhs(_lhs), rhs(_rhs), next(NULL) {}
-
-    ~AugmentedProduction() { if (next) delete next; }
+    AugmentedProduction() {}
+    AugmentedProduction(char _lhs, string _rhs) : lhs(_lhs), rhs(_rhs) {}
 };
-
 
 // Class for representing LR(0) items.
 class LR0Item
@@ -44,162 +34,166 @@ public:
 
     // constructor
     LR0Item() {}
-
     // destructor
     ~LR0Item() {}
 
     // add production
-    void push(AugmentedProduction *p) { productions.push_back(p); }
-
+    void Push(AugmentedProduction *p) { productions.push_back(p); }
     // return the number of productions
     int Size() { return int(productions.size()); }
 
-    bool Contains (string prodStr) {
+    // return whether or not this item contains the production prodStr
+    bool Contains (string production) {
         for (auto it = productions.begin(); it != productions.end(); it++) {
-            string thisStr = string(&(*it)->lhs, 1) + "->" + (*it)->rhs;
+            string existing = string(&(*it)->lhs, 1) + "->" + (*it)->rhs;
             //cout << " Comparing: " << thisStr << " , " << prodStr << endl;
-            if (strcmp(prodStr.c_str(), thisStr.c_str()) == 0) {
+            if (strcmp(production.c_str(), existing.c_str()) == 0) {
                 return true;
             }
         }
         return false;
     }
 
-    // get a production by reference
+    // overloaded index operator; access pointer to production.
     AugmentedProduction* operator[](const int index) {
         return productions[index];
     }
 };
 
-
-/**
- * void add_closure
- * --------------------------------------------------------------------------
- * If the 'next' is the current input symbol and next is a nonterminal, then
- * the set of LR(0) items reachable from this item on next includes the set
- * of LR(0) items reachable from this item on FIRST(next). Therefore we must
- * add all grammar productions with a lhs of next to this item */
+/* void add_closure
+ * If 'next' is the current input symbol and next is nonterminal, then the set
+ * of LR(0) items reachable from here on next includes all LR(0) items reachable
+ * from here on FIRST(next). Add all grammar productions with a lhs of next */
 void
-add_closure(AugmentedProduction *p, LR0Item& item, AugmentedGrammar& grammar)
+add_closure(char lookahead, LR0Item& item, AugmentedGrammar& grammar)
 {
-    // get lookahead
-    char next = p->rhs[p->rhs.find('@')+1];
-    string plhs = string(&next,1);
     // only continue if lookahead is a non-terminal
-    if (!isupper(next)) {
-        return;
-    }
+    if (!isupper(lookahead)) return;
 
+    string lhs = string(&lookahead, 1);
     // iterate over each grammar production beginning with p->rhs[next]
-    for (int i = 0; i<grammar[next].size(); i++) {
-        string prhs = "@" + grammar[next][i];
+    // to see if that production has already been included in this item.
+    for (int i = 0; i<grammar[lookahead].size(); i++) {
+        string rhs = "@" + grammar[lookahead][i];
         // if the grammar production for the next input symbol does not yet
         // exist for this item, add it to the item's set of productions
-        string prodStr = plhs + "->" + prhs;
-        if (!item.Contains(prodStr)) {
-            item.push(new AugmentedProduction(next, prhs));
+        if (!item.Contains( lhs + "->" + rhs )) {
+            item.Push(new AugmentedProduction(lookahead, rhs));
         }
     }
 }
 
-
+// produce the graph of LR(0) items from the given augmented grammar
 void
-gen_gotos(vector<LR0Item>& lr0items, AugmentedGrammar& grammar, int& itemid,
-         GotoMap& _goto)
+get_LR0_items(vector<LR0Item>& lr0items, AugmentedGrammar& grammar, int& itemid, GotoMap& globalGoto)
 {
     printf("I%d:\n", itemid);
 
-    map<char, int> localGoto;
-    AugmentedProduction *prod;
-
     // ensure that the current item contains te full closure of it's productions
-    for (int i = 0; i<lr0items[itemid].Size(); i++)
-    {
-        prod = lr0items[itemid][i];
-        add_closure(prod, lr0items[itemid], grammar);
+    for (int i = 0; i<lr0items[itemid].Size(); i++) {
+        string rhs = lr0items[itemid][i]->rhs;
+        char lookahead = rhs[rhs.find('@')+1];
+        add_closure(lookahead, lr0items[itemid], grammar);
     }
 
     int nextpos;
+    char lookahead, lhs;
+    string rhs;
+    AugmentedProduction *prod;
 
     // iterate over each production in this LR(0) item
-    for (int i = 0; i<lr0items[itemid].Size(); i++)
-    {
+    for (int i = 0; i<lr0items[itemid].Size(); i++) {
         // get the current production
-        prod = lr0items[itemid][i];
-        printf("\t%c->%s\t\t", prod->lhs, prod->rhs.c_str());
-        // get lookahead
-        nextpos = prod->rhs.find('@')+1;
-        if (nextpos == string::npos || nextpos == prod->rhs.length()) {
-            printf("\n");
+        lhs = lr0items[itemid][i]->lhs;
+        rhs = lr0items[itemid][i]->rhs;
+        string production = string(&lhs,1) + "->" + rhs;
+
+        // get lookahead if one exists
+        lookahead = rhs[rhs.find('@')+1];
+        if (lookahead == '\0') {
+            printf("\t%-20s\n", &production[0]);
             continue;
         }
-        char next = prod->rhs[nextpos];
+
         // if there is no goto defined for the current input symbol from this
         // item, assign one.
-        if (lr0items[itemid].gotos.find(next) == lr0items[itemid].gotos.end()) {
-            // if there is a global goto defined for the entire production, use
+        if (lr0items[itemid].gotos.find(lookahead) == lr0items[itemid].gotos.end()) {
             // that one instead of creating a new one
-            string currentProd = string(&(prod->lhs),1) + "->" + prod->rhs;
-            if (_goto.find(currentProd) == _goto.end()) {
+            // if there is a global goto defined for the entire production, use
+            if (globalGoto.find(production) == globalGoto.end()) {
                 lr0items.push_back(LR0Item()); // create new state (item)
-                // new right-hand-side is identical with '@' moved one space to
-                // the right
-                string newRhs = prod->rhs;
+                // new right-hand-side is identical with '@' moved one space to the right
+                string newRhs = rhs;
                 int atpos = newRhs.find('@');
                 swap(newRhs[atpos], newRhs[atpos+1]);
                 // add item and update gotos
-                lr0items.back().push(new AugmentedProduction(prod->lhs, newRhs));
-                lr0items[itemid].gotos[next] = lr0items.size()-1;
-                _goto[currentProd] = lr0items.size()-1;
+                lr0items.back().Push(new AugmentedProduction(lhs, newRhs));
+                lr0items[itemid].gotos[lookahead] = lr0items.size()-1;
+                globalGoto[production] = lr0items.size()-1;
             } else {
                 // use existing global item
-                lr0items[itemid].gotos[next] = _goto[currentProd];
+                lr0items[itemid].gotos[lookahead] = globalGoto[production];
             }
-            printf("goto(%c)=I%d", next, _goto[currentProd]);
+            printf("\t%-20s goto(%c)=I%d\n", &production[0], lookahead, globalGoto[production]);
         } else {
             // there is a goto defined, add the current production to it
             // move @ one space to right for new rhs
-            string newRhs = prod->rhs;
-            string newLhs = string(&prod->lhs, 1);
-            int atpos = newRhs.find('@');
-            swap(newRhs[atpos], newRhs[atpos+1]);
+            int at = rhs.find('@');
+            swap(rhs[at], rhs[at+1]);
             // add production to next item if it doesn't already contain it
-            int nextItem = lr0items[itemid].gotos[next];
-            if (!(lr0items[nextItem].Contains(newLhs + "->" + newRhs))) {
-                lr0items[nextItem].push(new AugmentedProduction(
-                    prod->lhs,
-                    newRhs
-                ));
+            int nextItem = lr0items[itemid].gotos[lookahead];
+            if (!lr0items[nextItem].Contains(string(&lhs, 1) + "->" + rhs)) {
+                lr0items[nextItem].Push(new AugmentedProduction(lhs, rhs));
             }
+            swap(rhs[at], rhs[at+1]);
+            printf("\t%-20s\n", &production[0]);
         }
-        printf("\n");
+    }
+}
+
+/**
+ * void load_grammar
+ * scan and load the grammar from stdin while setting first LR(0) item */
+void load_grammar(AugmentedGrammar& grammar, vector<LR0Item>& lr0items)
+{
+    string production;
+    string lhs, rhs;
+    char delim[] = "->", end = '\n';
+
+    getline(cin, lhs); // scan start production
+    grammar['\''].push_back(lhs);
+    lr0items[0].Push(new AugmentedProduction('\'', "@" + lhs));
+    printf("'->%s\n", lhs.c_str());
+
+    while(1) {
+        getline(cin, production);
+        if (production.length() < 1) return;
+
+        lhs = strtok(&production[0], delim);
+        rhs = strtok(NULL, delim);
+        grammar[lhs[0]].push_back(rhs);
+        printf("%s->%s\n", lhs.c_str(), rhs.c_str());
+        lr0items[0].Push(new AugmentedProduction(lhs[0], "@" + rhs));
     }
 }
 
 // main
 int main() {
-
     int itemid = -1; // counter for the number of LR(0) items
     AugmentedGrammar grammar;
-    vector<LR0Item> lr0items = {LR0Item()}; // push start state
-    GotoMap _goto;
+    vector<LR0Item> lr0items = { LR0Item() }; // push start state
+    GotoMap globalGoto;
 
-    grammar['\''] = {"E"};
-    grammar['E']  = {"E+T","T"};
-    grammar['T']  = {"T*F", "F"};
-    grammar['F']  = {"(E)", "i"};
+    printf("Augmented Grammar\n");
+    printf("-----------------\n");
+    load_grammar(grammar, lr0items);
+    printf("\n");
 
-    lr0items[0].push( new AugmentedProduction('\'', "@E"  ) );
-    lr0items[0].push( new AugmentedProduction('E',  "@E+T") );
-    lr0items[0].push( new AugmentedProduction('E',  "@T"  ) );
-    lr0items[0].push( new AugmentedProduction('T',  "@T*F") );
-    lr0items[0].push( new AugmentedProduction('T',  "@F"  ) );
-    lr0items[0].push( new AugmentedProduction('F',  "@(E)") );
-    lr0items[0].push( new AugmentedProduction('F',  "@i"  ) );
-
+    printf("Sets of LR(0) Items\n");
+    printf("-------------------\n");
     while (++itemid < int(lr0items.size())) {
-        gen_gotos(lr0items, grammar, itemid, _goto);
+        get_LR0_items(lr0items, grammar, itemid, globalGoto);
     }
-
+    printf("\n");
     return 0;
 }
