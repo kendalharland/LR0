@@ -158,8 +158,8 @@ void load_grammar(AugmentedGrammar& grammar, vector<LR0Item>& lr0items)
 {
     string production;
     string lhs, rhs;
-    char delim[] = "->", end = '\n';
-
+    string delim = "->";
+    
     getline(cin, lhs); // scan start production
     grammar['\''].push_back(lhs);
     lr0items[0].Push(new AugmentedProduction('\'', "@" + lhs));
@@ -169,8 +169,12 @@ void load_grammar(AugmentedGrammar& grammar, vector<LR0Item>& lr0items)
         getline(cin, production);
         if (production.length() < 1) return;
 
-        lhs = strtok(&production[0], delim);
-        rhs = strtok(NULL, delim);
+        auto pos = production.find(delim);
+        if(pos!=string::npos){
+            lhs = production.substr(0,pos);
+            rhs = production.substr(pos+delim.length(),std::string::npos);
+        }
+        
         grammar[lhs[0]].push_back(rhs);
         printf("%s->%s\n", lhs.c_str(), rhs.c_str());
         lr0items[0].Push(new AugmentedProduction(lhs[0], "@" + rhs));
